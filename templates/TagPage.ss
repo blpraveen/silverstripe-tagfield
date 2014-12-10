@@ -26,14 +26,6 @@
 			<li class="clearfix">
 				<h2><a class="searchResultHeader" href="$Link">$Title</a></h2>
 
-				<p class="pageinfo">
-					Last edited $LastEdited.ago
-					<% if getDepartmentPage %>
-						in <a href="$getPage.Link">$getPage.Title</a>
-					<% end_if %>
-				</p> 
-
-			
 				<p>$Content.ContextSummary</p>
 				
 				<p><a class="more" href="$Link">Continue reading...</a></p>
