@@ -20,10 +20,10 @@
  * </code>
  * <code>
  * $form = new Form($this,'Form',
- * 	new FieldSet(
+ * 	new FieldList(
  * 		new TagField('Tags', 'My Tags', null, 'Article', 'Title')
  *	)
- * 	new FieldSet()
+ * 	new FieldList()
  * );
  * $form->loadDataFrom($myArticle);
  * $form->saveInto($myArticle);
@@ -54,7 +54,8 @@ class TagField extends TextField {
 	 * The value should be a property name on the DataObject defined in {@link $tagTopicClass}
 	 */
 	protected $tagObjectField = 'Title';
-	
+
+	protected $tagObjectSlugField = 'Slug';
 	/**
 	 * @var string $tagFilter
 	 */
@@ -120,11 +121,9 @@ class TagField extends TextField {
 		if (Director::is_ajax()) {
 			Requirements::javascript(THIRDPARTY_DIR . '/jquery-livequery/jquery.livequery.js');
 		}
-
-		Requirements::javascript("tagfield/thirdparty/jquery-tags/jquery.tags.js");
+		Requirements::javascript("tagfield/thirdparty/jquery-tags/jquery.tokenize.css");
+		Requirements::javascript("tagfield/thirdparty/jquery-tags/jquery.tokenize.js");
 		Requirements::javascript("tagfield/javascript/TagField.js");
-		Requirements::css("tagfield/css/TagField.css");
-
 		return parent::Field($properties);
 	}
 
@@ -150,7 +149,7 @@ class TagField extends TextField {
 	public function suggest($request) {
 		$tagTopicClassObj = singleton($this->getTagTopicClass());
 		
-		$searchString = $request->requestVar('tag');
+		$searchString = $request->requestVar('search');
 		$searchString = trim($searchString); # incase its comma seperated, and they do comma-space (, ) 
 		
 		if($this->customTags) {
@@ -162,7 +161,6 @@ class TagField extends TextField {
 		} else {
 			user_error('TagField::suggest(): Cant find valid relation or text property with name "' . $this->getName() . '"', E_USER_ERROR);
 		}
-		
 		return Convert::raw2json($tags);
 	}
 	
@@ -181,6 +179,7 @@ class TagField extends TextField {
 		if(isset($obj) && is_object($obj) && $obj instanceof DataObject && $obj->many_many($this->getName())) {
 			//if(!$obj->many_many($this->getName())) user_error("TagField::setValue(): Cant find relationship named '$this->getName()' on object", E_USER_ERROR);
 			$tags = $obj->{$this->getName()}();
+			$this->setAttribute('data-ids',	implode($this->separator,$tags->column('ID')));
 			$this->value = implode($this->separator, array_values($tags->map('ID',$this->tagObjectField)->toArray()));
 		} else {
 			parent::setValue($value, $obj);
@@ -223,15 +222,18 @@ class TagField extends TextField {
 		// list of new tag IDs
 		$newTags = array();
 		if($tagsArr) foreach($tagsArr as $tagString) {
+			$filter = URLSegmentFilter::create();
+			$t = $filter->filter($tagString);
 			$SQL_filter = sprintf("\"%s\".\"%s\" = '%s'",
 				$tagBaseClass,
-				$this->tagObjectField,
+				$this->tagObjectSlugField,
 				Convert::raw2sql($tagString)
 			);
 			$tagObj = DataObject::get_one($tagClass, $SQL_filter);
 			if(!$tagObj && $this->createNewTags) {
 				$tagObj = new $tagClass();
 				$tagObj->{$this->tagObjectField} = $tagString;
+				$tagObj->{$this->tagObjectSlugField} = $t;
 				$tagObj->write();
 			}
 			if ($tagObj) $newTags[] = $tagObj->ID;
@@ -239,23 +241,7 @@ class TagField extends TextField {
 		
 		// set new tags
 		$tagsComponentSet->setByIdList($newTags);
-		
-		if($this->deleteUnusedTags) {
-			// check for tags which are no longer used
-			$removedTags = array_diff($existingTags, $newTags);
-			list($parentClass, $tagClass, $parentIDField, $tagIDField, $relationTable) = $record->many_many($relationName);
-			$counts = array();
-			foreach($removedTags as $removedTagID) {
-				$removedTagQuery = new SQLQuery(
-					array("COUNT(\"ID\")"),
-					array('"'.$relationTable.'"'),
-					array(sprintf("\"%s\" = %d", $tagIDField, (int)$removedTagID))
-				);
-				$removedTagCount = $removedTagQuery->execute()->value();
-				
-				if($removedTagCount == 0) DataObject::delete_by_id($tagClass, $removedTagID);
-			}
-		}
+		//Deleting the Default Tags so commenting
 	}
 	
 	protected function saveIntoTextbasedTags($record) {
@@ -298,10 +284,17 @@ class TagField extends TextField {
 			Convert::raw2sql($searchString)
 		);
 		if($this->tagFilter) $SQL_filter .= ' AND ' . $this->tagFilter;
-		
 		$tagObjs = DataObject::get($tagClass, $SQL_filter, $this->tagSort, "", $this->maxSuggestionsNum);
-		$tagArr = ($tagObjs) ? array_values($tagObjs->map('ID', $this->tagObjectField)->toArray()) : array();
-		
+		if($tagObjs) {
+			$tagArr = array();
+			foreach($tagObjs as $tagObj) {		
+				$tagArr[] = array('value' => $tagObj->ID, 'text' => $tagObj->{$this->tagObjectField});
+			}
+				
+                } else {
+			$tagArr = array();
+		}	
+		//$tagArr = ($tagObjs) ? array_values($tagObjs->map('ID', $this->tagObjectField)->toArray()) : ;
 		return $tagArr;
 	}
 	
