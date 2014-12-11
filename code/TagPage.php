@@ -6,6 +6,11 @@ Class TagPage extends Page {
 }
 class TagPage_Controller extends Page_Controller
 {
+	public function init() {
+		parent::init();
+	        Requirements::css("tagfield/css/tag-page.css");
+	
+	}	
 	static $allowed_actions = array(
 		'index',
 		'specificTags',
