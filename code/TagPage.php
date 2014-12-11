@@ -81,7 +81,7 @@ class TagPage_Controller extends Page_Controller
 		$data = array(
 			'Results' => $tag_list
 		);			
-		return $this->customise($data)->renderWith(array('PageTagIndex', 'Page_results','Page'));
+		return $this->customise($data)->renderWith(array('TagPageIndex', 'Page_results','Page'));
         }
 	//UrlHandelres not redirecting Hence using common methods to all
 	//Controller
